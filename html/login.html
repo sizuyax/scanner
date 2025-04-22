@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Login Page</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .container {
+            background: #ffffff;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 300px;
+            box-sizing: border-box;
+        }
+        input {
+            padding: 8px;
+            font-size: 20px;
+            width: 100%;
+            margin-bottom: 10px;
+            border: 1px solid #155724;
+            border-radius: 4px;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .error-message {
+            color: red;
+            font-size: 14px;
+            display: none;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ff4444;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none;
+            animation: fadeIn 0.5s, fadeOut 0.5s 2.5s;
+        }
+        .toast.success {
+            background-color: #4CAF50;
+        }
+        .toast.warning {
+            background-color: #FFC107;
+        }
+    </style>
+</head>
+<body>
+<div class="container" id="login-container">
+    <input type="password" id="password" placeholder="Enter password" autofocus>
+    <p class="error-message" id="error-message">Wrong password!</p>
+</div>
+
+<script>
+    const passwordInput = document.getElementById("password");
+    const errorMessage = document.getElementById("error-message");
+    const loginContainer = document.getElementById("login-container");
+
+    document.addEventListener("DOMContentLoaded", function() {
+        passwordInput.focus();
+
+        function keepFocus() {
+            if (document.activeElement !== passwordInput) {
+                passwordInput.focus();
+            }
+        }
+
+        setInterval(keepFocus, 100);
+
+        passwordInput.addEventListener("keydown", function(event) {
+            if (event.key === "Enter") {
+                login(passwordInput.value);
+            }
+        });
+
+        function login(password) {
+            fetch("/api/v1/auth", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: password })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.status) {
+                        errorMessage.style.display = "block";
+                        passwordInput.value = "";
+                    } else {
+                        if (data.is_admin) {
+                            window.location.href = "/admin";
+                        } else {
+                            // Завантажуємо шаблон xml_file.html
+                            loadXmlFileTemplate(data.filename);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error("Network error:", error);
+                    errorMessage.textContent = "Network error. Please try again.";
+                    errorMessage.style.display = "block";
+                });
+        }
+
+        function loadXmlFileTemplate(filename) {
+            // Завантажуємо шаблон xml_file.html
+            fetch("/xml_file.html")
+                .then(response => response.text())
+                .then(template => {
+                    // Вставляємо шаблон у body
+                    document.body.innerHTML = template;
+
+                    // Ініціалізуємо WebSocket з'єднання
+                    initWebSocket(filename);
+
+                    // Ініціалізуємо всі необхідні обробники подій
+                    initEventHandlers();
+                })
+                .catch(error => {
+                    console.error("Error loading template:", error);
+                    window.location.href = "/";
+                });
+        }
+
+        function initWebSocket() {
+            const webSocketURL = '{{ .WebSocketURL }}';
+            let socket = new WebSocket(webSocketURL);
+
+            let products = [];
+            let productState = {};
+
+            socket.onopen = function() {
+                console.log("WebSocket connected");
+                showToast("Connected to inventory", "success");
+            };
+
+            socket.onmessage = function(event) {
+                try {
+                    const response = JSON.parse(event.data);
+                    console.log("WebSocket message:", response);
+
+                    if (response.products) {
+                        // Оновлюємо дані продуктів
+                        products = response.products;
+                        productState = response.product_state || {};
+                        renderProducts();
+                    } else if (response.action === "update") {
+                        // Оновлюємо конкретний продукт
+                        if (response.catalog_number) {
+                            productState[response.catalog_number] = {
+                                scanned: response.scanned,
+                                difference: response.difference,
+                                status: response.status
+                            };
+                            renderProducts();
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error parsing WebSocket message:", error);
+                }
+            };
+
+            socket.onclose = function() {
+                console.log("WebSocket disconnected");
+                showToast("Disconnected from server", "warning");
+            };
+
+            function renderProducts() {
+                const productsContainer = document.querySelector('.products');
+                if (!productsContainer) return;
+
+                productsContainer.innerHTML = '';
+
+                products.forEach(product => {
+                    const state = product.ean
+                        ? productState[product.ean]
+                        : productState[product.catalog_number];
+
+                    const productItem = document.createElement('div');
+                    productItem.className = 'product-item';
+
+                    if (state) {
+                        productItem.dataset.scanned = state.scanned;
+                        productItem.dataset.difference = state.difference;
+                        productItem.dataset.status = state.status;
+
+                        if (state.status === 1) {
+                            productItem.classList.add('completed');
+                        } else if (state.status === 2) {
+                            productItem.classList.add('working');
+                        } else if (state.status === 3) {
+                            productItem.classList.add('error');
+                        }
+                    }
+
+                    let html = `
+                        <div class="product-info">
+                            <span class="catalog-number"><strong>${product.catalog_number}</strong></span>
+                            <span class="name">${product.name}</span>
+                        </div>`;
+
+                    if (product.ean) {
+                        html += `
+                            <span class="quantity-status">
+                                ${state?.amount || 0} / ${state?.scanned || 0} / ${state?.difference || 0}
+                            </span>`;
+                    } else {
+                        html += `<span class="missing-ean-indicator">[None EAN]</span>`;
+                    }
+
+                    productItem.innerHTML = html;
+                    productsContainer.appendChild(productItem);
+                });
+            }
+
+            function showToast(message, type = "error") {
+                const toast = document.getElementById("toast");
+                if (!toast) return;
+
+                toast.textContent = message;
+                toast.className = `toast ${type}`;
+                toast.style.display = "block";
+
+                setTimeout(() => {
+                    toast.style.display = "none";
+                }, 3000);
+            }
+
+            // Додаємо socket до глобального об'єкта window для доступу з інших функцій
+            window.socket = socket;
+            window.sendEAN = function(ean, quantity) {
+                if (socket.readyState === WebSocket.OPEN) {
+                    const message = JSON.stringify({
+                        action: "scan",
+                        ean: ean,
+                        quantity: quantity
+                    });
+                    socket.send(message);
+                } else {
+                    showErrorModal("WebSocket not connected. Try to reopen window.");
+                }
+            };
+        }
+
+        function initEventHandlers() {
+            const eanInput = document.getElementById('ean');
+            const quantityInput = document.getElementById('quantity');
+            const undoButton = document.getElementById('undo-scan');
+            const customKeyboard = document.querySelector('.custom-keyboard');
+
+            if (eanInput) {
+                eanInput.focus();
+
+                eanInput.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        const eanValue = eanInput.value.trim();
+                        if (eanValue) {
+                            const quantity = parseInt(quantityInput.value, 10) || 1;
+                            window.sendEAN(eanValue, quantity);
+                            eanInput.value = '';
+                            quantityInput.value = 1;
+                        }
+                    }
+                });
+            }
+
+            if (undoButton) {
+                undoButton.addEventListener('click', async function() {
+                    try {
+                        const response = await fetch(`/api/v1/undo_scan`, {
+                            method: 'GET',
+                        });
+
+                        const data = await response.json();
+
+                        if (data.status) {
+                            showToast('Last scan undone', "success");
+                            if (eanInput) eanInput.focus();
+                        } else {
+                            showErrorModal(data.error || 'Unknown error occurred');
+                        }
+                    } catch (error) {
+                        console.error('Error undoing scan:', error);
+                        showErrorModal(error.message);
+                    }
+                });
+            }
+
+            // Ініціалізація кастомної клавіатури
+            if (customKeyboard && quantityInput) {
+                let preventAutoFocus = false;
+
+                quantityInput.addEventListener('focus', function() {
+                    this.value = '';
+                    customKeyboard.style.display = 'grid';
+                    preventAutoFocus = true;
+                });
+
+                quantityInput.addEventListener('blur', function() {
+                    setTimeout(() => {
+                        if (!preventAutoFocus && eanInput) {
+                            eanInput.focus();
+                        }
+                    }, 10);
+                });
+
+                customKeyboard.style.display = 'none';
+
+                quantityInput.addEventListener('focus', function() {
+                    customKeyboard.style.display = 'grid';
+                });
+
+                if (eanInput) {
+                    eanInput.addEventListener('focus', function() {
+                        if (!quantityInput.value.trim()) {
+                            quantityInput.value = 1;
+                        } else if (quantityInput.value < 1) {
+                            quantityInput.value = 1;
+                        }
+                        customKeyboard.style.display = 'none';
+                    });
+                }
+
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter' ||
+                        event.key === 'ArrowLeft' ||
+                        event.key === 'ArrowRight' ||
+                        event.key === 'ArrowUp' ||
+                        event.key === 'ArrowDown') {
+                        customKeyboard.style.display = 'none';
+                        preventAutoFocus = false;
+                        if (eanInput) eanInput.focus();
+                    }
+                });
+
+                const keyboardButtons = document.querySelectorAll('.key');
+                keyboardButtons.forEach(button => {
+                    button.addEventListener('mousedown', function() {
+                        preventAutoFocus = true;
+                    });
+
+                    button.addEventListener('click', function() {
+                        const value = this.dataset.value;
+                        if (value) {
+                            if (quantityInput.value.length < 3) {
+                                quantityInput.value += value;
+                            }
+                        } else if (this.classList.contains('accept')) {
+                            quantityInput.value = removeFirstZero(quantityInput.value);
+
+                            if (!quantityInput.value.trim()) {
+                                quantityInput.value = 1;
+                            }
+                            customKeyboard.style.display = 'none';
+                            preventAutoFocus = false;
+                            if (eanInput) eanInput.focus();
+                        } else if (this.classList.contains('clear')) {
+                            quantityInput.value = '';
+                        }
+                    });
+                });
+            }
+
+            // Ініціалізація модального вікна помилок
+            const errorModal = document.getElementById('error-modal');
+            if (errorModal) {
+                document.getElementById('close-error-modal')?.addEventListener('click', function() {
+                    errorModal.style.display = 'none';
+                    if (eanInput) {
+                        eanInput.disabled = false;
+                        eanInput.focus();
+                    }
+                    if (quantityInput) quantityInput.disabled = false;
+                    if (undoButton) undoButton.disabled = false;
+                    document.querySelectorAll('.footer button').forEach(button => button.disabled = false);
+                });
+            }
+
+            // Ініціалізація кнопки звіту
+            const reportButton = document.querySelector('.report-button');
+            if (reportButton) {
+                reportButton.addEventListener('click', generateReport);
+            }
+        }
+
+        function removeFirstZero(value) {
+            if (value.length > 1 && value[0] === '0') {
+                return value.slice(1);
+            }
+            return value;
+        }
+
+        function showErrorModal(message) {
+            const errorModal = document.getElementById('error-modal');
+            const errorMessage = document.getElementById('error-message');
+
+            if (errorModal && errorMessage) {
+                errorMessage.textContent = message;
+                errorModal.style.display = 'flex';
+
+                const eanInput = document.getElementById('ean');
+                const quantityInput = document.getElementById('quantity');
+                const undoButton = document.getElementById('undo-scan');
+
+                if (eanInput) eanInput.disabled = true;
+                if (quantityInput) quantityInput.disabled = true;
+                if (undoButton) undoButton.disabled = true;
+                document.querySelectorAll('.footer button').forEach(button => button.disabled = true);
+            }
+        }
+
+        async function generateReport() {
+            try {
+                const filename = document.querySelector('.header h1')?.textContent;
+                if (!filename) return;
+
+                const response = await fetch(`/api/v1/reports/${filename}`, {
+                    method: 'GET',
+                });
+
+                const data = await response.json();
+
+                if (data.status) {
+                    showToast('Report generated successfully!', "success");
+                } else {
+                    showErrorModal(data.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                console.error('Error generating report:', error);
+                showErrorModal(error.message);
+            }
+        }
+    });
+</script>
+</body>
+</html>

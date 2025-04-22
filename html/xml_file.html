@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>{{ .Filename }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .container {
+            display: grid;
+            grid-template-rows: minmax(50px, auto) 1fr minmax(50px, auto);
+            grid-template-columns: 1fr;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            max-width: 100vw;
+        }
+        .top-section {
+            position: sticky;
+            width: calc(100vw - 40px);
+            max-width: 100vw;
+            padding: min(20px, 3vh);
+            height: auto;
+            min-height: min-content;
+            max-height: 20vh;
+            background-color: #fff;
+            display: grid;
+            grid-template-columns: 70% 30%;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            border-bottom: 1px solid #ccc;
+            gap: min(10px, 1vh);
+            z-index: 100;
+            box-shadow: 0px 5px 5px rgba(0,0,0,0.2);
+        }
+
+        .top-section .left-side {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: min(10px, 1vh);
+        }
+
+        .top-section .undo-button {
+            max-height: min(110px, 15vh);
+            padding: min(10px, 1vh);
+            aspect-ratio: 1 / 1;
+            height: auto;
+            width: auto;
+            justify-self: end;
+            border: 2px solid #000;
+        }
+
+        .top-section .undo-button img {
+            max-height: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+        .inputs {
+            display: grid;
+            gap: min(10px, 1vh);
+            font-size: clamp(16px, 4vh, 24px);
+            grid-template-columns: 25% 65%;
+        }
+
+        .inputs input {
+            padding: clamp(5px, 2vh, 15px) 5px;
+            font-size: clamp(16px, 4vh, 24px);
+            border: 2px solid #000;
+            border-radius: 8px;
+            min-width: 40px;
+        }
+
+        .inputs input#quantity {
+
+        }
+
+        .inputs input#ean {
+
+
+        }
+
+        .inputs input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .inputs input[type="number"]::-webkit-outer-spin-button,
+        .inputs input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .custom-keyboard {
+            position: sticky;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: none;
+            box-sizing: border-box;
+            padding: 10px;
+            z-index: 30;
+            box-shadow: none;
+            border-top: 1px solid #ddd;
+            overflow: hidden;
+
+            grid-template-rows: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+
+            padding-bottom: calc(var(--footer-height) + var(--safe-area-inset-bottom));
+        }
+
+        .keyboard-row {
+            display: contents;
+        }
+
+        .key {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: calc(16px + 1vw);
+            border: 3px solid #000;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .accept{
+            background-color: #008000;
+            color: #fff;
+        }
+
+        .clear{
+            background-color: indianred;
+            color: #000;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            padding: min(20px, 3vh) min(20px, 3vw);
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            display: grid;
+            grid-template-columns: 50% 50%;
+            gap: min(10px, 1vh);
+            height: clamp(120px, 18vh, 180px);
+            height: var(--footer-height);
+            background-color: #fff;
+            z-index: 100;
+            box-shadow: 0px -10px 10px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+        }
+
+        .back-button {
+            justify-self: start;
+        }
+
+        .report-button {
+            justify-self: end;
+        }
+
+        .footer-btn {
+            /*max-height: min(110px, 16vh);*/
+            max-height: clamp(50px, 12vh, 120px);
+            /*padding: min(10px, 1vh);*/
+            padding: min(10px, 1.5vh);
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /*height: auto;*/
+            height: 100%;
+            width: 100%;
+            border: 2px solid #000;
+        }
+
+        .footer-btn img {
+            max-height: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+        .error-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .error-modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        #error-message {
+            font-size: 18px;
+            color: #721c24;
+            margin-bottom: 20px;
+        }
+
+        #close-error-modal {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #close-error-modal:hover {
+            background-color: #c82333;
+        }
+
+        .error-modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #error-message {
+            font-size: 18px;
+            color: #721c24;
+            margin-bottom: 0;
+        }
+
+        #close-error-modal {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            align-self: center;
+        }
+
+        #close-error-modal:hover {
+            background-color: #c82333;
+        }
+
+        .content{
+            position: relative;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 10;
+            padding-bottom: calc(var(--footer-height) + var(--safe-area-inset-bottom));
+        }
+        :root {
+            --footer-height: clamp(120px, 18vh, 180px);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
+        }
+
+        .products {
+            overflow-x: auto;
+            max-height: 100%;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+           z-index: 10;
+            background: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        /*    */
+            padding-bottom: calc(var(--footer-height) + var(--safe-area-inset-bottom));
+            width: 100%;
+            box-sizing: border-box;
+            border-top: none;
+            /*padding-bottom: calc(90px + env(safe-area-inset-bottom));*/
+        }
+        .product-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            /*padding: 15px;*/
+            border-bottom: 2px solid #ddd;
+            background: white;
+            font-size: 24px;
+        /*    */
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+        }
+        .product-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex-grow: 1;
+        }
+        .catalog-number {
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .name {
+            font-size: 24px;
+            color: #555;
+        }
+        .quantity-status {
+            font-size: 48px;
+            font-weight: bold;
+            text-align: right;
+            padding: 10px;
+            color: #333;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            min-width: 200px;
+            margin-left: 20px;
+            flex-shrink: 0;
+        }
+        .product-item.completed {
+            background-color: #d4edda;
+            border-left: 6px solid #28a745;
+        }
+        .product-item.working {
+            background-color: #fff3cd;
+            border-left: 6px solid #ffc107;
+        }
+        .product-item.error {
+            background-color: #f8d7da;
+            border-left: 6px solid #dc3545;
+        }
+        .product-item.missing-ean {
+            border-bottom: 2px dashed #ffc107;
+        }
+        .product-item.recently-scanned::before {
+            content: "→";
+            font-size: 32px;
+            font-weight: bold;
+            color: #007bff;
+            margin-right: 10px;
+        }
+        .error-desc {
+            color: #ffc107;
+            font-weight: bold;
+            margin-left: 10px;
+            text-shadow:
+                    -1px -1px 0 #000,
+                    1px -1px 0 #000,
+                    -1px 1px 0 #000,
+                    1px 1px 0 #000;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ff4444;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none;
+            animation: fadeIn 0.5s, fadeOut 0.5s 2.5s;
+        }
+        .toast.success {
+            background-color: #4CAF50;
+        }
+        .toast.warning {
+            background-color: #FFC107;
+        }
+
+        .top-section, .footer {
+            width: 100%;
+            padding: min(20px, 3vh);
+            box-sizing: border-box;
+            margin: 0;
+        }
+        @media (max-width: 600px) {
+
+            .inputs {
+
+
+            }
+            .inputs input {
+
+
+            }
+            .quantity-status {
+                font-size: 25px;
+                min-width: 25px;
+            }
+            .catalog-number {
+                font-size: 20px;
+            }
+            .name {
+                font-size: 15px;
+                color: #555;
+            }
+
+        }
+        @media screen and (max-height: 680px) {
+            .top-section {
+                max-height: 27vh;
+            }
+
+            .inputs input {
+                padding: 7px;
+                font-size: 16px;
+            }
+        }
+        @media screen and (max-height: 600px) {
+            /*.custom-keyboard {*/
+            /*    gap: 8px;*/
+            /*    padding: 8px;*/
+            /*}*/
+
+            .key {
+                font-size: calc(14px + 0.8vw);
+                border-width: 2px;
+            }
+        }
+        @media screen and (max-height: 500px) {
+            .top-section {
+                max-height: 25vh;
+            }
+
+            .inputs {
+                gap: 5px;
+            }
+
+            .inputs input {
+                padding: 5px;
+                font-size: 14px;
+            }
+        }
+        @media screen and (max-height: 400px) {
+            /*.custom-keyboard {*/
+            /*    gap: 5px;*/
+            /*    padding: 5px;*/
+            /*}*/
+
+            .key {
+                font-size: calc(12px + 0.5vw);
+                border-width: 1px;
+            }
+        }
+        @media screen and (max-height: 350px) {
+            .top-section {
+                padding: 5px;
+            }
+            .header h1 {
+                font-size: 10px;
+                margin: 2px 0;
+            }
+
+            .inputs {
+                grid-template-columns: 20% 75%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" >
+    <div class="top-section">
+       <div class="left-side">
+           <div class="inputs">
+               <input type="number" class="input-small" id="quantity" value="1" min="1">
+               <input type="text" id="ean" placeholder="ean" autofocus>
+           </div>
+       </div>
+        <button class="undo-button" id="undo-scan">
+            <img src="/images/undo.png" alt="Undo last scan">
+        </button>
+    </div>
+    <div class="content">
+        <div class="custom-keyboard">
+
+            <button class="key" data-value="1">1</button>
+            <button class="key" data-value="2">2</button>
+            <button class="key" data-value="3">3</button>
+
+
+            <button class="key" data-value="4">4</button>
+            <button class="key" data-value="5">5</button>
+            <button class="key" data-value="6">6</button>
+
+
+            <button class="key" data-value="7">7</button>
+            <button class="key" data-value="8">8</button>
+            <button class="key" data-value="9">9</button>
+
+            <button class="key clear">C</button>
+            <button class="key" data-value="0">0</button>
+            <button class="key accept">✓</button>
+
+        </div>
+        <div class="products">
+            {{ range .Products }}
+            {{ $state := index $.ProductState .Ean }}
+            {{ if not $state }}
+            {{ $state = index $.ProductState .CatalogNumber }}
+            {{ end }}
+
+            {{ if $state }}
+            <div class="product-item {{ if eq $state.Status 1 }}completed{{ else if eq $state.Status 2 }}working{{ else if eq $state.Status 3 }}error{{ end }}"
+                 data-catalog-number="{{ .CatalogNumber }}"
+                 data-amount="{{ $state.Amount }}"
+                 data-scanned="{{ $state.Scanned }}"
+                 data-difference="{{ $state.Difference }}"
+                 data-status="{{ $state.Status }}">
+                <div class="product-info">
+                    <span class="catalog-number"><strong>{{ .CatalogNumber }}</strong></span>
+                    {{ if $state.ErrorDesc }}
+                    <span class="name">⚠️ {{ .Name }} <span class="error-desc">{{ $state.ErrorDesc }}</span></span>
+                    {{ else }}
+                    <span class="name">{{ .Name }}</span>
+                    {{ end }}
+                </div>
+                <span class="quantity-status">
+                    {{ $state.Amount }} / {{ $state.Scanned }} / {{ $state.Difference }}
+                </span>
+            </div>
+            {{ end }}
+            {{ end }}
+        </div>
+    </div>
+    <div class="footer">
+        <button class="footer-btn back-button" onclick="handleBack()">
+            <img src="/images/back.png" alt="Back">
+        </button>
+
+        <button class="footer-btn report-button" onclick="generateReport()">
+            <img src="/images/report.png" alt="Generate a report">
+        </button>
+    </div>
+</div>
+
+<div id="error-modal" class="error-modal">
+    <div class="error-modal-content">
+        <span id="error-message"></span>
+        <button id="close-error-modal">Close</button>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<audio id="ok-sound" src="/sounds/ok.mp3"></audio>
+<audio id="error-sound" src="/sounds/error.mp3"></audio>
+<audio id="scan-sound" src="/sounds/scan.mp3"></audio>
+
+<script>
+    const webSocketURL = "{{ .WebSocketURL }}";
+    let socket;
+
+    const eanInput = document.getElementById('ean');
+    const quantityInput = document.getElementById('quantity');
+    const undoButton = document.getElementById('undo-scan');
+
+    const okSound = document.getElementById("ok-sound");
+    const errorSound = document.getElementById("error-sound");
+    const scanSound = document.getElementById("scan-sound");
+
+    function handleBack() {
+        fetch("/api/v1/logout", {
+            method: "GET",
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status) {
+                    window.location.href = "/";
+                } else {
+                    showErrorModal(data.error || "Failed to logout.");
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                showErrorModal("Network error. Please try again.");
+            });
+    }
+
+    function removeFirstZero(value) {
+        if (value.length > 1 && value[0] === '0') {
+            return value.slice(1);
+        }
+        return value;
+    }
+
+    function checkError(code, redirect, error) {
+        if (code === 10015) {
+            showErrorModal("Session expired. Please login again.");
+            setTimeout(() => {
+                window.location.href = redirect;
+            }, 3000);
+        } else {
+            showErrorModal(error || "Network error. Please try again.");
+        }
+    }
+
+    setInterval(checkSession, 30000);
+
+    function checkSession() {
+        fetch("/api/v1/check_session")
+            .then(response => response.json())
+            .then(data => {
+                if (!data.status) {
+                    checkError(data.code, data.redirect, data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                checkError(0, "", error);
+            });
+    }
+
+    quantityInput.addEventListener('input', function() {
+        if (this.value.length === 1 && this.value[0] === '0') {
+            this.value = '';
+        }
+
+        if (this.value < 1) {
+            this.value = 1;
+        }
+    });
+
+    let isErrorModalOpen = false;
+
+    function showErrorModal(message) {
+        const errorModal = document.getElementById('error-modal');
+        const errorMessage = document.getElementById('error-message');
+
+        errorMessage.textContent = message;
+        errorModal.style.display = 'flex';
+        isErrorModalOpen = true;
+
+        eanInput.disabled = true;
+        quantityInput.disabled = true;
+        undoButton.disabled = true;
+        document.querySelectorAll('.footer button').forEach(button => button.disabled = true);
+    }
+
+    function closeErrorModal() {
+        const errorModal = document.getElementById('error-modal');
+        errorModal.style.display = 'none';
+        isErrorModalOpen = false;
+
+        eanInput.disabled = false;
+        quantityInput.disabled = false;
+        undoButton.disabled = false;
+        document.querySelectorAll('.footer button').forEach(button => button.disabled = false);
+
+        eanInput.focus();
+    }
+
+    document.getElementById('close-error-modal').addEventListener('click', closeErrorModal);
+
+    undoButton.addEventListener('click', async function() {
+        try {
+            const response = await fetch(`/api/v1/undo_scan`, {
+                method: 'GET',
+            });
+
+            const data = await response.json();
+
+            if (data.status) {
+
+                const productItem = document.querySelector(`.product-item[data-catalog-number="${data.state.catalog_number}"]`);
+                console.log("Founded product:", productItem);
+
+                if (productItem) {
+                    const quantityStatus = productItem.querySelector('.quantity-status');
+                    console.log("Founded quantityStatus:", quantityStatus);
+
+                    productItem.dataset.scanned = data.state.scanned;
+                    productItem.dataset.difference = data.state.difference;
+
+                    quantityStatus.textContent = `${data.state.amount} / ${data.state.scanned} / ${data.state.difference}`;
+
+                    productItem.classList.remove('completed', 'working', 'error');
+
+                    if (data.state.status === 1) {
+                        productItem.classList.add('completed');
+                        okSound.play();
+                    } else if (data.state.status === 2) {
+                        productItem.classList.add('working');
+                    } else if (data.state.status === 3) {
+                        productItem.classList.add('error');
+                    }
+                    // const previouslyScanned = document.querySelector('.product-item.recently-scanned');
+                    //
+                    // previouslyScanned.classList.remove('recently-scanned');
+                }
+
+                okSound.play();
+                showToast('Last scan undone', "success");
+                eanInput.focus()
+            } else {
+                errorSound.play();
+                if (data.code === 1002) {
+                    // showToast('No last scan to cancel.', "error");
+                    showErrorModal('No last scan to cancel.');
+                } else if (data.code === 10015){
+                    // showToast('Session expired. Please login again.', "error");
+                    checkError(data.code, data.redirect, data.error || 'Session expired. Please login again.');
+                } else {
+                    // showToast(data.error || 'Unknown error occurred', "error");
+                    showErrorModal(data.error || 'Unknown error occurred');
+                }
+            }
+        } catch (error) {
+            console.error('Error generating report:', error);
+            errorSound.play();
+            // showToast(error.message, "error");
+            checkError(0, "", error.message)
+            // showErrorModal(error.message);
+        }
+    });
+
+    function showToast(message, type = "error") {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.className = `toast ${type}`;
+        toast.style.display = "block";
+
+        setTimeout(() => {
+            toast.style.display = "none";
+        }, 3000);
+    }
+
+    async function generateReport() {
+        try {
+            const response = await fetch(`/api/v1/report`, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                // showToast(response.error || 'Network response was not ok', "error");
+                showErrorModal(response.error || 'Network response was not ok');
+            }
+
+            const data = await response.json();
+
+            if (data.status) {
+                okSound.play();
+                showToast('Report generated successfully!', "success");
+            } else {
+                errorSound.play();
+                // showToast(data.error || 'Unknown error occurred', "error");
+                checkError(data.code, data.redirect, data.error || 'Unknown error occurred');
+            }
+        } catch (error) {
+            console.error('Error generating report:', error);
+            errorSound.play();
+            // showToast(error.message, "error");
+            showErrorModal(error.message);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const customKeyboard = document.querySelector('.custom-keyboard');
+        const quantityInput = document.getElementById('quantity');
+        const eanInput = document.getElementById('ean');
+
+        eanInput.focus();
+
+        let preventAutoFocus = false;
+
+        quantityInput.addEventListener('focus', function() {
+            this.value = '';
+            customKeyboard.style.display = 'grid';
+            preventAutoFocus = true;
+        });
+
+        quantityInput.addEventListener('blur', function() {
+            setTimeout(() => {
+                if (!preventAutoFocus) {
+                    eanInput.focus();
+                }
+            }, 10);
+        });
+
+        customKeyboard.style.display = 'none';
+
+        quantityInput.addEventListener('focus', function() {
+            customKeyboard.style.display = 'grid';
+        });
+
+        eanInput.addEventListener('focus', function() {
+            if (!quantityInput.value.trim()) {
+                quantityInput.value = 1;
+            } else if (quantityInput.value < 1) {
+                quantityInput.value = 1;
+            }
+            customKeyboard.style.display = 'none';
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' ||
+                event.key === 'ArrowLeft' ||
+                event.key === 'ArrowRight' ||
+                event.key === 'ArrowUp' ||
+                event.key === 'ArrowDown') {
+                customKeyboard.style.display = 'none';
+                preventAutoFocus = false;
+                eanInput.focus();
+            }
+        });
+
+        const keyboardButtons = document.querySelectorAll('.key');
+        keyboardButtons.forEach(button => {
+            button.addEventListener('mousedown', function() {
+                preventAutoFocus = true;
+            });
+
+            button.addEventListener('click', function() {
+                const value = this.dataset.value;
+                if (value) {
+                    if (quantityInput.value.length < 3) {
+                        quantityInput.value += value;
+                    }
+                } else if (this.classList.contains('accept')) {
+                    quantityInput.value = removeFirstZero(quantityInput.value);
+
+                    if (!quantityInput.value.trim()) {
+                        quantityInput.value = 1;
+                    }
+                    customKeyboard.style.display = 'none';
+                    preventAutoFocus = false;
+                    eanInput.focus();
+                } else if (this.classList.contains('clear')) {
+                    quantityInput.value = '';
+                }
+            });
+        });
+
+        document.addEventListener('click', function(event) {
+            const isKeyboard = event.target.closest('.custom-keyboard');
+            const isQuantity = event.target === quantityInput;
+            const isEan = event.target === eanInput;
+            const isButton = event.target.closest('button');
+
+            if (!isKeyboard && !isQuantity && !isEan && !isButton) {
+                preventAutoFocus = false;
+                eanInput.focus();
+            }
+        });
+
+        customKeyboard.addEventListener('mouseup', function() {
+            setTimeout(() => {
+                preventAutoFocus = false;
+            }, 100);
+        });
+
+        window.addEventListener('focus', function() {
+            if (!preventAutoFocus) {
+                eanInput.focus();
+            }
+        });
+    });
+
+    window.onload = function() {
+        if (!quantityInput.value.trim()) {
+            quantityInput.value = 1;
+        }
+
+        eanInput.focus();
+
+        const productItems = document.querySelectorAll('.product-item');
+        productItems.forEach(productItem => {
+            const status = parseInt(productItem.dataset.status, 10);
+
+            if (status === 1) {
+                productItem.classList.add('completed');
+            } else if (status === 2) {
+                productItem.classList.add('working');
+            } else if (status === 3) {
+                productItem.classList.add('error');
+            }
+        });
+
+        socket = new WebSocket(webSocketURL);
+
+        socket.onmessage = function(event) {
+            try {
+                const response = JSON.parse(event.data);
+                console.log("Response:", response);
+
+                if (response.code) {
+                    switch (response.code) {
+                        case 1001: // EANNotFoundCode
+                            // showToast("EAN not found", "error");
+                            showErrorModal("EAN not found");
+                            break;
+                        case 1003: // InternalServerErrorCode
+                            // showToast(response.error || "Internal Server Error", "error");
+                            showErrorModal(response.error || "Internal Server Error");
+                            break;
+                        case 10015: // SessionExpiredCode
+                            showErrorModal("Session expired. Please login again.");
+                            break;
+                        default:
+                            // showToast(response.error || "Unknown error", "error");
+                            showErrorModal(response.error || "Unknown error");
+                    }
+                    errorSound.play();
+                } else {
+                    switch (response.action) {
+                        case "reset_scan_history":
+                            handleResetScanHistory(response);
+                            break;
+                        case "file_deleted":
+                            showErrorModal("File deleted");
+                            setInterval(() => {
+                                window.location.href = "/";
+                            }, 3000);
+                            break;
+                        case "file_uploaded":
+                            showErrorModal("File uploaded");
+                            setInterval(() => {
+                                window.location.href = "/";
+                            }, 3000);
+                            break;
+                        default:
+                            const productItem = document.querySelector(`.product-item[data-catalog-number="${response.catalog_number}"]`);
+                            console.log("Founded product:", productItem);
+
+                            if (productItem) {
+                                const quantityStatus = productItem.querySelector('.quantity-status');
+                                console.log("Founded quantityStatus:", quantityStatus);
+
+                                productItem.dataset.scanned = response.scanned;
+                                productItem.dataset.difference = response.difference;
+
+                                quantityStatus.textContent = `${response.amount} / ${response.scanned} / ${response.difference}`;
+
+                                productItem.classList.remove('completed', 'working', 'error');
+
+                                console.log("Action:", response.action, "Status:", response.status);
+                                if (response.action === "scan") {
+                                    scanSound.play();
+                                }
+
+                                if (response.status === 1) {
+                                    productItem.classList.add('completed');
+                                    okSound.play();
+                                } else if (response.status === 2) {
+                                    productItem.classList.add('working');
+                                } else if (response.status === 3) {
+                                    productItem.classList.add('error');
+                                    console.log("Action: ", response.action, "from response:", response);
+                                    if (response.action === "scan") {
+                                        errorSound.play();
+                                        // showToast(`Scanned ${response.scanned}, expected ${response.amount}`, "error");
+                                        showErrorModal(`Scanned ${response.scanned}, expected ${response.amount}`);
+                                    }
+                                }
+
+                                const previouslyScanned = document.querySelector('.product-item.recently-scanned');
+                                if (previouslyScanned) {
+                                    previouslyScanned.classList.remove('recently-scanned');
+                                }
+
+                                productItem.classList.add('recently-scanned');
+
+                                const productsContainer = document.querySelector('.products');
+                                productsContainer.prepend(productItem);
+
+                                productsContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                    }
+                }
+            } catch (error) {
+                console.error("Error parsing JSON:", error);
+                errorSound.play();
+                // showToast(error.message, "error");
+                showErrorModal(error.message);
+            }
+        };
+
+        function handleResetScanHistory(response) {
+            const productStates = response.ps;
+
+            productStates.forEach(state => {
+                const productItem = document.querySelector(`.product-item[data-catalog-number="${state.catalog_number}"]`);
+                if (productItem) {
+                    const quantityStatus = productItem.querySelector('.quantity-status');
+                    if (quantityStatus) {
+                        quantityStatus.textContent = `${state.amount} / ${state.scanned} / ${state.difference}`;
+                    }
+
+                    productItem.dataset.scanned = state.scanned;
+                    productItem.dataset.difference = state.difference;
+
+                    productItem.classList.remove('completed', 'working', 'error');
+                    if (state.status === 1) {
+                        productItem.classList.add('completed');
+                    } else if (state.status === 2) {
+                        productItem.classList.add('working');
+                    } else if (state.status === 3) {
+                        productItem.classList.add('error');
+                    }
+                }
+            });
+
+            showToast("Scan history reset successfully!", "success");
+        }
+
+        socket.onopen = function() {
+            console.log("WebSocket connected");
+            showToast("WebSocket connected", "success");
+        };
+
+        socket.onclose = function() {
+            console.log("WebSocket disconnected. Reconnecting...");
+            showToast("WebSocket disconnected. Reconnecting...", "warning");
+            setTimeout(() => {
+                const newSocket = new WebSocket(webSocketURL);
+                newSocket.onopen = socket.onopen;
+                newSocket.onmessage = socket.onmessage;
+                newSocket.onclose = socket.onclose;
+                socket = newSocket;
+            }, 3000);
+        };
+
+        function sendEAN(ean, quantity) {
+            if (socket.readyState === WebSocket.OPEN) {
+                const message = JSON.stringify({ ean: ean, quantity: quantity });
+                socket.send(message);
+            } else {
+                errorSound.play();
+                // showToast("WebSocket not connected. Try to reopen window.", "error");
+                showErrorModal("WebSocket not connected. Try to reopen window.");
+            }
+        }
+
+        eanInput.addEventListener('keydown', function(event) {
+            if (isErrorModalOpen) {
+                event.preventDefault();
+                return;
+            }
+
+            if (event.key === 'Enter') {
+                const eanValue = eanInput.value.trim();
+                if (eanValue) {
+                    console.log("EAN:", eanValue);
+                    const quantity = parseInt(quantityInput.value, 10) || 1;
+                    sendEAN(eanValue, quantity);
+
+                    eanInput.value = '';
+                    quantityInput.value = 1;
+                    eanInput.focus();
+                }
+            }
+        });
+    };
+</script>
+
+</body>
+</html>
